@@ -1,0 +1,599 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>TruthLens — Fake News Detection</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=IBM+Plex+Sans:wght@300;400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg:#f5f4f0;--surface:#ffffff;--surface-2:#f0efe9;--border:#e0ddd5;--border-2:#ccc9be;
+      --text:#1a1916;--text-2:#5a5850;--text-3:#9a9890;
+      --accent:#1a3a5c;--accent-2:#2563a8;--accent-bg:#eef3f9;
+      --real:#0f6b45;--real-bg:#e8f5ef;--real-border:#a8d9bf;
+      --fake:#9b1c1c;--fake-bg:#fef2f2;--fake-border:#f5b8b8;
+      --warn:#92400e;--warn-bg:#fffbeb;
+      --shadow-sm:0 1px 3px rgba(0,0,0,0.08),0 1px 2px rgba(0,0,0,0.04);
+      --shadow-md:0 4px 16px rgba(0,0,0,0.08),0 2px 6px rgba(0,0,0,0.05);
+      --shadow-lg:0 12px 40px rgba(0,0,0,0.1),0 4px 12px rgba(0,0,0,0.06);
+      --radius:12px;--radius-lg:18px;
+    }
+    .dark {
+      --bg:#111214;--surface:#1c1e22;--surface-2:#242629;--border:#2e3035;--border-2:#3a3d44;
+      --text:#e8e6e0;--text-2:#9a9890;--text-3:#5a5850;
+      --accent:#6b9fd4;--accent-2:#4d8fc4;--accent-bg:#1a2535;
+      --real:#34d39a;--real-bg:#0a1f16;--real-border:#1a5a3a;
+      --fake:#f87171;--fake-bg:#1f0a0a;--fake-border:#5a1a1a;
+      --warn:#fbbf24;--warn-bg:#1f1500;
+      --shadow-sm:0 1px 3px rgba(0,0,0,0.4);
+      --shadow-md:0 4px 16px rgba(0,0,0,0.4);
+      --shadow-lg:0 12px 40px rgba(0,0,0,0.5);
+    }
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    html{scroll-behavior:smooth}
+    body{font-family:'IBM Plex Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;display:flex;flex-direction:column;transition:background 0.35s,color 0.35s}
+
+    /* LOADING */
+    #loadingScreen{position:fixed;inset:0;z-index:1000;background:#0f1623;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2rem;transition:opacity 0.6s,visibility 0.6s}
+    #loadingScreen.hidden{opacity:0;visibility:hidden;pointer-events:none}
+    .loader-brand{font-family:'Playfair Display',serif;font-size:2.2rem;font-weight:700;color:#e8e6e0;letter-spacing:-0.02em}
+    .loader-brand span{color:#4d8fc4}
+    .loader-track{width:200px;height:2px;background:rgba(255,255,255,0.1);border-radius:100px;overflow:hidden}
+    .loader-fill{height:100%;background:linear-gradient(90deg,#2563a8,#6b9fd4);border-radius:100px;animation:loadFill 2s cubic-bezier(0.4,0,0.2,1) forwards}
+    @keyframes loadFill{0%{width:0%}40%{width:50%}70%{width:80%}100%{width:100%}}
+    .loader-dots{display:flex;gap:6px;justify-content:center}
+    .loader-dots span{width:5px;height:5px;background:#4d8fc4;border-radius:50%;animation:dotBounce 1.1s infinite ease-in-out}
+    .loader-dots span:nth-child(2){animation-delay:0.18s}
+    .loader-dots span:nth-child(3){animation-delay:0.36s}
+    @keyframes dotBounce{0%,80%,100%{transform:scale(0.5);opacity:0.35}40%{transform:scale(1);opacity:1}}
+    .loader-status{font-family:'IBM Plex Mono',monospace;font-size:0.68rem;color:#4a5a70;letter-spacing:0.12em;text-transform:uppercase}
+
+    /* NAV */
+    nav{display:flex;align-items:center;justify-content:space-between;padding:0 2.5rem;height:64px;background:var(--surface);border-bottom:1px solid var(--border);box-shadow:var(--shadow-sm);position:sticky;top:0;z-index:100;transition:background 0.35s,border-color 0.35s}
+    .nav-left{display:flex;align-items:center;gap:0.75rem}
+    .logo-mark{width:34px;height:34px;border-radius:8px;background:var(--accent);display:grid;place-items:center;font-size:1rem}
+    .logo-text{font-family:'Playfair Display',serif;font-size:1.2rem;font-weight:700;color:var(--text);letter-spacing:-0.02em}
+    .nav-badge{font-size:0.6rem;font-weight:600;background:var(--accent-bg);color:var(--accent-2);border:1px solid var(--border);border-radius:4px;padding:0.15rem 0.45rem;letter-spacing:0.08em;text-transform:uppercase}
+    .nav-right{display:flex;align-items:center;gap:1rem}
+    .nav-link{font-size:0.82rem;font-weight:500;color:var(--text-2);text-decoration:none;padding:0.35rem 0;border-bottom:2px solid transparent;transition:color 0.2s,border-color 0.2s}
+    .nav-link:hover{color:var(--text);border-color:var(--accent)}
+    #themeToggle{display:flex;align-items:center;gap:0.4rem;background:var(--surface-2);border:1px solid var(--border);color:var(--text-2);border-radius:8px;padding:0.4rem 0.85rem;font-family:'IBM Plex Sans',sans-serif;font-size:0.78rem;font-weight:500;cursor:pointer;transition:all 0.2s}
+    #themeToggle:hover{border-color:var(--accent-2);color:var(--text)}
+
+    /* HERO */
+    .hero{background:var(--surface);border-bottom:1px solid var(--border);padding:3.5rem 2.5rem 3rem;text-align:center;animation:fadeDown 0.5s ease both 0.1s}
+    @keyframes fadeDown{from{opacity:0;transform:translateY(-12px)}to{opacity:1;transform:translateY(0)}}
+    .hero-eyebrow{display:inline-flex;align-items:center;gap:0.5rem;font-family:'IBM Plex Mono',monospace;font-size:0.68rem;letter-spacing:0.14em;text-transform:uppercase;color:var(--accent-2);margin-bottom:1.1rem;background:var(--accent-bg);border:1px solid var(--border);padding:0.3rem 0.8rem;border-radius:100px}
+    .hero-eyebrow::before{content:'';width:6px;height:6px;border-radius:50%;background:var(--accent-2)}
+    h1{font-family:'Playfair Display',serif;font-size:clamp(1.9rem,4vw,3rem);font-weight:700;line-height:1.15;color:var(--text);letter-spacing:-0.03em;margin-bottom:0.9rem}
+    h1 em{font-style:italic;color:var(--accent-2)}
+    .hero-sub{font-size:0.92rem;color:var(--text-2);line-height:1.7;max-width:480px;margin:0 auto 2rem;font-weight:300}
+    .hero-stats{display:inline-flex;gap:2.5rem;background:var(--surface-2);border:1px solid var(--border);padding:0.75rem 2rem;border-radius:100px}
+    .hero-stat-val{font-family:'IBM Plex Mono',monospace;font-size:1.1rem;font-weight:500;color:var(--text);display:block}
+    .hero-stat-lbl{font-size:0.65rem;color:var(--text-3);letter-spacing:0.05em}
+
+    /* MAIN */
+    main{flex:1;max-width:860px;width:100%;margin:0 auto;padding:2.5rem 1.5rem;animation:fadeUp 0.5s ease both 0.2s}
+    @keyframes fadeUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
+
+    /* TABS */
+    .tab-bar{display:flex;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius) var(--radius) 0 0;border-bottom:none;overflow:hidden}
+    .tab-btn{flex:1;padding:0.85rem 1.2rem;background:none;border:none;font-family:'IBM Plex Sans',sans-serif;font-size:0.82rem;font-weight:500;color:var(--text-3);cursor:pointer;display:flex;align-items:center;justify-content:center;gap:0.4rem;border-bottom:2px solid transparent;transition:all 0.2s}
+    .tab-btn:first-child{border-right:1px solid var(--border)}
+    .tab-btn.active{color:var(--accent-2);border-bottom-color:var(--accent-2);background:var(--accent-bg)}
+    .tab-btn:hover:not(.active){color:var(--text);background:var(--surface-2)}
+
+    /* CARD */
+    .card{background:var(--surface);border:1px solid var(--border);border-radius:0 0 var(--radius-lg) var(--radius-lg);padding:1.75rem;box-shadow:var(--shadow-md);margin-bottom:1.5rem}
+    .field-label{font-size:0.72rem;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:var(--text-2);margin-bottom:0.5rem;display:flex;justify-content:space-between;align-items:center}
+    .field-hint{font-weight:400;color:var(--text-3);letter-spacing:0;text-transform:none;font-size:0.7rem}
+    textarea,.url-input{width:100%;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);font-family:'IBM Plex Sans',sans-serif;font-size:0.875rem;line-height:1.7;padding:1rem;outline:none;transition:border-color 0.2s,box-shadow 0.2s}
+    textarea{resize:none;min-height:150px}
+    textarea::placeholder,.url-input::placeholder{color:var(--text-3)}
+    textarea:focus,.url-input:focus{border-color:var(--accent-2);box-shadow:0 0 0 3px rgba(37,99,168,0.1);background:var(--surface)}
+    .dark textarea:focus,.dark .url-input:focus{box-shadow:0 0 0 3px rgba(107,159,212,0.12)}
+    .url-row{display:flex;gap:0.6rem}
+    .url-input{flex:1}
+    .url-fetch-btn{padding:0 1.2rem;background:var(--accent);color:#fff;border:none;border-radius:var(--radius);font-family:'IBM Plex Sans',sans-serif;font-size:0.8rem;font-weight:600;cursor:pointer;white-space:nowrap;transition:opacity 0.2s,transform 0.15s}
+    .url-fetch-btn:hover{opacity:0.88;transform:translateY(-1px)}
+    .url-note{margin-top:0.6rem;font-size:0.73rem;color:var(--text-3);display:flex;align-items:center;gap:0.35rem}
+    .tab-panel{display:none}
+    .tab-panel.active{display:block}
+
+    /* ACTION ROW */
+    .action-row{display:flex;align-items:center;justify-content:space-between;gap:1rem;margin-top:1.25rem;flex-wrap:wrap}
+    .char-info{font-family:'IBM Plex Mono',monospace;font-size:0.7rem;color:var(--text-3)}
+    #analyzeBtn{display:flex;align-items:center;gap:0.6rem;padding:0.75rem 2rem;background:var(--accent);color:#fff;border:none;border-radius:var(--radius);font-family:'IBM Plex Sans',sans-serif;font-size:0.88rem;font-weight:600;cursor:pointer;letter-spacing:0.01em;transition:all 0.2s;box-shadow:0 2px 8px rgba(26,58,92,0.3)}
+    .dark #analyzeBtn{box-shadow:0 2px 8px rgba(107,159,212,0.2)}
+    #analyzeBtn:hover:not(:disabled){background:var(--accent-2);transform:translateY(-1px);box-shadow:0 4px 14px rgba(26,58,92,0.35)}
+    #analyzeBtn:disabled{opacity:0.55;cursor:not-allowed;transform:none}
+    .btn-spinner{width:15px;height:15px;border:2px solid rgba(255,255,255,0.35);border-top-color:#fff;border-radius:50%;animation:spin 0.65s linear infinite;display:none}
+    @keyframes spin{to{transform:rotate(360deg)}}
+    #analyzeBtn.loading .btn-spinner{display:block}
+    #analyzeBtn.loading .btn-label{opacity:0.75}
+
+    /* RESULT */
+    #resultSection{display:none}
+    #resultSection.visible{display:block;animation:fadeUp 0.4s ease both}
+    .section-title{font-size:0.72rem;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;color:var(--text-3);margin-bottom:0.85rem;display:flex;align-items:center;gap:0.5rem}
+    .section-title::after{content:'';flex:1;height:1px;background:var(--border)}
+    .result-card{border-radius:var(--radius-lg);border:1px solid var(--border);overflow:hidden;box-shadow:var(--shadow-md)}
+    .result-header{padding:1.4rem 1.75rem;display:flex;align-items:center;gap:1.25rem;border-bottom:1px solid var(--border)}
+    .result-card.real .result-header{background:var(--real-bg);border-color:var(--real-border)}
+    .result-card.fake .result-header{background:var(--fake-bg);border-color:var(--fake-border)}
+    .result-card.error .result-header{background:var(--warn-bg)}
+    .verdict-icon-wrap{width:52px;height:52px;border-radius:12px;display:grid;place-items:center;font-size:1.5rem;flex-shrink:0}
+    .real .verdict-icon-wrap{background:rgba(15,107,69,0.12)}
+    .fake .verdict-icon-wrap{background:rgba(155,28,28,0.1)}
+    .error .verdict-icon-wrap{background:rgba(146,64,14,0.1)}
+    .verdict-meta{flex:1}
+    .verdict-eyebrow{font-size:0.65rem;font-weight:600;letter-spacing:0.12em;text-transform:uppercase;margin-bottom:0.25rem}
+    .real .verdict-eyebrow{color:var(--real)}
+    .fake .verdict-eyebrow{color:var(--fake)}
+    .error .verdict-eyebrow{color:var(--warn)}
+    .verdict-title{font-family:'Playfair Display',serif;font-size:1.6rem;font-weight:700;line-height:1}
+    .real .verdict-title{color:var(--real)}
+    .fake .verdict-title{color:var(--fake)}
+    .error .verdict-title{color:var(--warn)}
+    .conf-badge{font-family:'IBM Plex Mono',monospace;font-size:1.2rem;font-weight:500;color:var(--text-2);text-align:right;flex-shrink:0}
+    .conf-badge small{display:block;font-size:0.6rem;color:var(--text-3);text-align:right;letter-spacing:0.08em;text-transform:uppercase}
+    .result-body{padding:1.4rem 1.75rem;background:var(--surface)}
+    .conf-bar-row{display:flex;justify-content:space-between;font-size:0.7rem;color:var(--text-3);margin-bottom:0.4rem}
+    .conf-track{height:6px;background:var(--surface-2);border-radius:100px;overflow:hidden;margin-bottom:1.25rem;border:1px solid var(--border)}
+    .conf-fill{height:100%;border-radius:100px;width:0%;transition:width 1s cubic-bezier(0.22,1,0.36,1)}
+    .real .conf-fill{background:linear-gradient(90deg,#0f6b45,#34d39a)}
+    .fake .conf-fill{background:linear-gradient(90deg,#9b1c1c,#f87171)}
+    .result-note{font-size:0.82rem;color:var(--text-2);line-height:1.65;padding:0.9rem 1rem;background:var(--surface-2);border-radius:var(--radius);border-left:3px solid var(--border)}
+    .real .result-note{border-left-color:var(--real)}
+    .fake .result-note{border-left-color:var(--fake)}
+    .result-footer{padding:0.9rem 1.75rem;background:var(--surface-2);border-top:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.5rem}
+    .result-meta-tag{font-family:'IBM Plex Mono',monospace;font-size:0.65rem;color:var(--text-3);display:flex;align-items:center;gap:0.35rem}
+    .result-meta-tag span{color:var(--text-2)}
+    .re-analyze{font-size:0.75rem;font-weight:500;color:var(--accent-2);background:none;border:1px solid var(--border);border-radius:6px;padding:0.3rem 0.75rem;cursor:pointer;font-family:'IBM Plex Sans',sans-serif;transition:all 0.2s}
+    .re-analyze:hover{border-color:var(--accent-2);background:var(--accent-bg)}
+
+    /* STATS */
+    .stats-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1rem;margin-top:1.5rem}
+    .stat-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:1.1rem 1rem;box-shadow:var(--shadow-sm);display:flex;align-items:center;gap:0.85rem}
+    .stat-icon{width:38px;height:38px;border-radius:9px;display:grid;place-items:center;font-size:1.1rem;flex-shrink:0;background:var(--surface-2)}
+    .stat-val{font-family:'IBM Plex Mono',monospace;font-size:1.4rem;font-weight:500;color:var(--text);line-height:1}
+    .stat-lbl{font-size:0.67rem;color:var(--text-3);letter-spacing:0.04em;margin-top:0.15rem}
+
+    /* HOW IT WORKS */
+    .how-section{margin-top:2.5rem}
+    .steps-row{display:grid;grid-template-columns:repeat(3,1fr);gap:1rem}
+    .step-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:1.25rem;box-shadow:var(--shadow-sm)}
+    .step-num{font-family:'IBM Plex Mono',monospace;font-size:0.65rem;color:var(--accent-2);letter-spacing:0.1em;margin-bottom:0.6rem}
+    .step-title{font-family:'Playfair Display',serif;font-size:1rem;font-weight:600;margin-bottom:0.4rem}
+    .step-desc{font-size:0.78rem;color:var(--text-2);line-height:1.6}
+
+    /* FOOTER */
+    footer{background:var(--surface);border-top:1px solid var(--border);padding:1.2rem 2.5rem;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.5rem}
+    .footer-left{font-size:0.78rem;color:var(--text-3);display:flex;align-items:center;gap:0.6rem}
+    .footer-left strong{color:var(--text-2);font-weight:600}
+    .footer-right{display:flex;gap:0.5rem;flex-wrap:wrap}
+    .footer-tag{font-family:'IBM Plex Mono',monospace;font-size:0.65rem;color:var(--text-3);background:var(--surface-2);border:1px solid var(--border);border-radius:4px;padding:0.2rem 0.5rem}
+
+    /* PARTICLE CANVAS */
+    #particleCanvas {
+      position: fixed; inset: 0; z-index: 0;
+      pointer-events: none;
+      opacity: 1; transition: opacity 0.5s;
+    }
+    nav, .hero, main, footer { position: relative; z-index: 2; }
+    #loadingScreen { z-index: 1000; }
+
+    /* Light mode: subtle canvas */
+    body:not(.dark) #particleCanvas { opacity: 0.45; }
+
+    @media(max-width:600px){
+      nav{padding:0 1.2rem}
+      .nav-link{display:none}
+      .hero{padding:2rem 1.2rem 1.75rem}
+      .hero-stats{gap:1.5rem;padding:0.6rem 1.25rem}
+      main{padding:1.5rem 1rem}
+      .card{padding:1.25rem}
+      .steps-row{grid-template-columns:1fr}
+      .stats-grid{grid-template-columns:1fr 1fr}
+      footer{padding:1rem 1.2rem}
+    }
+  </style>
+</head>
+<body>
+
+<!-- PARTICLE BACKGROUND -->
+<canvas id="particleCanvas"></canvas>
+
+<!-- LOADING SCREEN -->
+<div id="loadingScreen">
+  <div class="loader-brand">Truth<span>Lens</span></div>
+  <div class="loader-track"><div class="loader-fill"></div></div>
+  <div style="display:flex;flex-direction:column;align-items:center;gap:0.6rem;">
+    <div class="loader-dots"><span></span><span></span><span></span></div>
+    <div class="loader-status" id="loaderStatus">Initialising system</div>
+  </div>
+</div>
+
+<!-- NAV -->
+<nav>
+  <div class="nav-left">
+    <div class="logo-mark">🔍</div>
+    <span class="logo-text">TruthLens</span>
+
+  </div>
+  <div class="nav-right">
+    <a href="#how" class="nav-link">How It Works</a>
+    <a href="#about" class="nav-link">About</a>
+    <button id="themeToggle"><span id="themeIcon">🌙</span><span id="themeLabel">Dark</span></button>
+  </div>
+</nav>
+
+<!-- HERO -->
+<section class="hero">
+
+  <h1>Verify News with<br><em>Machine Intelligence</em></h1>
+  <p class="hero-sub">Paste article text or a news URL. Our trained ML model analyses linguistic patterns to determine credibility instantly.</p>
+  <div class="hero-stats">
+    <div class="hero-stat"><span class="hero-stat-val" id="heroChecked">0</span><span class="hero-stat-lbl">Analysed</span></div>
+    <div class="hero-stat"><span class="hero-stat-val" id="heroReal">0</span><span class="hero-stat-lbl">Real</span></div>
+    <div class="hero-stat"><span class="hero-stat-val" id="heroFake">0</span><span class="hero-stat-lbl">Fake</span></div>
+  </div>
+</section>
+
+<!-- MAIN -->
+<main>
+  <div class="tab-bar">
+    <button class="tab-btn active" data-tab="text">📄 Paste Article Text</button>
+    <button class="tab-btn" data-tab="url">🔗 Enter News URL</button>
+  </div>
+
+  <div class="card">
+    <div class="tab-panel active" id="panel-text">
+      <div class="field-label">Article Content <span class="field-hint">Min. 30 characters recommended</span></div>
+      <textarea id="newsInput" rows="6" placeholder="Paste or type the full news article or headline here…"></textarea>
+    </div>
+
+    <div class="tab-panel" id="panel-url">
+      <div class="field-label">News Article URL <span class="field-hint">Sends URL to your backend for processing</span></div>
+      <div class="url-row">
+        <input class="url-input" id="urlInput" type="url" placeholder="https://www.example.com/news/article…" />
+        <button class="url-fetch-btn" id="fetchUrlBtn">Use URL</button>
+      </div>
+      <div class="url-note">ℹ️ Make sure your Node.js backend handles URL-based input.</div>
+    </div>
+
+    <div class="action-row">
+      <span class="char-info" id="charInfo">0 characters</span>
+      <button id="analyzeBtn">
+        <div class="btn-spinner"></div>
+        <span class="btn-label">Analyse Article</span>
+      </button>
+    </div>
+  </div>
+
+  <div id="resultSection">
+    <div class="section-title">Analysis Result</div>
+    <div id="resultCard"></div>
+  </div>
+
+  <div class="stats-grid">
+    <div class="stat-card"><div class="stat-icon">📊</div><div><div class="stat-val" id="statChecked">0</div><div class="stat-lbl">Articles Checked</div></div></div>
+    <div class="stat-card"><div class="stat-icon">✅</div><div><div class="stat-val" id="statReal">0</div><div class="stat-lbl">Verified Real</div></div></div>
+    <div class="stat-card"><div class="stat-icon">🚨</div><div><div class="stat-val" id="statFake">0</div><div class="stat-lbl">Detected Fake</div></div></div>
+  </div>
+
+  <div class="how-section" id="how">
+    <div class="section-title">How It Works</div>
+    <div class="steps-row">
+      <div class="step-card"><div class="step-num">STEP 01</div><div class="step-title">Input Text</div><div class="step-desc">Paste a news article or headline. The more content provided, the more accurate the model's result.</div></div>
+      <div class="step-card"><div class="step-num">STEP 02</div><div class="step-title">TF-IDF Vectorisation</div><div class="step-desc">Your text is converted into numerical features using Term Frequency–Inverse Document Frequency weighting.</div></div>
+      <div class="step-card"><div class="step-num">STEP 03</div><div class="step-title">Naive Bayes Prediction</div><div class="step-desc">A trained Multinomial Naive Bayes classifier predicts Real or Fake with a confidence score.</div></div>
+    </div>
+  </div>
+
+  <div class="how-section" id="about" style="margin-bottom:1rem;">
+    <div class="section-title">About This Project</div>
+    <div class="step-card">
+      <div class="step-num">FINAL YEAR PROJECT · BSc IT</div>
+      <div class="step-title">Fake News Detection System</div>
+      <div class="step-desc" style="max-width:600px;">Built with a Node.js + Express backend, a Python scikit-learn ML model, and a responsive HTML/CSS/JS frontend. The model uses TF-IDF vectorisation and Multinomial Naive Bayes classification. This tool is for educational purposes — always verify news with trusted sources.</div>
+    </div>
+  </div>
+</main>
+
+<!-- FOOTER -->
+<footer>
+  <div class="footer-left">🔍 <strong>TruthLens</strong> — Final Year BSc IT Project</div>
+  <div class="footer-right">
+    <span class="footer-tag">Node.js</span>
+    <span class="footer-tag">Python</span>
+    <span class="footer-tag">scikit-learn</span>
+    <span class="footer-tag">TF-IDF</span>
+    <span class="footer-tag">Naive Bayes</span>
+  </div>
+</footer>
+
+<script>
+  /* LOADING */
+  const msgs = ['Initialising system','Loading ML model','Verifying vectoriser','System ready'];
+  let mi = 0;
+  const loaderStatus = document.getElementById('loaderStatus');
+  const msgTimer = setInterval(() => { loaderStatus.textContent = msgs[Math.min(++mi, msgs.length-1)]; }, 500);
+  window.addEventListener('load', () => {
+    setTimeout(() => {
+      clearInterval(msgTimer);
+      loaderStatus.textContent = 'Ready';
+      document.getElementById('loadingScreen').classList.add('hidden');
+    }, 2100);
+  });
+
+  /* THEME */
+  const themeToggle = document.getElementById('themeToggle');
+  function setTheme(dark) {
+    document.body.classList.toggle('dark', dark);
+    document.getElementById('themeIcon').textContent  = dark ? '☀️' : '🌙';
+    document.getElementById('themeLabel').textContent = dark ? 'Light' : 'Dark';
+    localStorage.setItem('theme', dark ? 'dark' : 'light');
+  }
+  setTheme(localStorage.getItem('theme') === 'dark');
+  themeToggle.addEventListener('click', () => setTheme(!document.body.classList.contains('dark')));
+
+  /* TABS */
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+      btn.classList.add('active');
+      document.getElementById('panel-' + btn.dataset.tab).classList.add('active');
+    });
+  });
+
+  /* URL btn — switches to text tab and populates textarea */
+  document.getElementById('fetchUrlBtn').addEventListener('click', () => {
+    const url = document.getElementById('urlInput').value.trim();
+    if (!url) return;
+    document.querySelector('[data-tab="text"]').click();
+    document.getElementById('newsInput').value = url;
+    document.getElementById('charInfo').textContent = url.length + ' characters';
+    document.getElementById('newsInput').focus();
+  });
+
+  /* CHAR COUNTER */
+  const newsInput = document.getElementById('newsInput');
+  const charInfo  = document.getElementById('charInfo');
+  newsInput.addEventListener('input', () => charInfo.textContent = newsInput.value.length + ' characters');
+
+  /* STATS */
+  let stats = { checked:0, real:0, fake:0 };
+  function updateStats() {
+    document.getElementById('statChecked').textContent = stats.checked;
+    document.getElementById('statReal').textContent    = stats.real;
+    document.getElementById('statFake').textContent    = stats.fake;
+    document.getElementById('heroChecked').textContent = stats.checked;
+    document.getElementById('heroReal').textContent    = stats.real;
+    document.getElementById('heroFake').textContent    = stats.fake;
+  }
+
+  /* ANALYSE */
+  const analyzeBtn    = document.getElementById('analyzeBtn');
+  const resultSection = document.getElementById('resultSection');
+  const resultCard    = document.getElementById('resultCard');
+
+  analyzeBtn.addEventListener('click', async () => {
+    const text = newsInput.value.trim();
+    if (!text || text.length < 10) {
+      newsInput.style.borderColor = 'var(--fake-border)';
+      newsInput.focus();
+      setTimeout(() => newsInput.style.borderColor = '', 1400);
+      return;
+    }
+    analyzeBtn.disabled = true;
+    analyzeBtn.classList.add('loading');
+    analyzeBtn.querySelector('.btn-label').textContent = 'Analysing…';
+    resultSection.classList.remove('visible');
+    const ts = new Date().toLocaleTimeString();
+
+    try {
+      const res  = await fetch('http://localhost:5000/analyze', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ text })
+      });
+      const data = await res.json();
+      const isReal  = data.prediction?.toLowerCase() === 'real';
+      const isFake  = data.prediction?.toLowerCase() === 'fake';
+      const cls     = isReal ? 'real' : isFake ? 'fake' : 'real';
+      const icon    = isReal ? '✅' : isFake ? '🚨' : '✅';
+      const label   = data.prediction || 'Unknown';
+      const conf    = parseFloat(data.confidence) || 0;
+      const confPct = (conf > 1 ? conf : conf * 100).toFixed(1);
+      const note    = isReal
+        ? 'Linguistic patterns are consistent with credible reporting. Always cross-reference with trusted news sources before sharing.'
+        : isFake
+        ? 'This article shows patterns commonly associated with misinformation. Verify with multiple authoritative sources before sharing.'
+        : label;
+
+      stats.checked++;
+      if (isReal) stats.real++; else if (isFake) stats.fake++;
+      updateStats();
+
+      resultCard.innerHTML = `
+        <div class="result-card ${cls}">
+          <div class="result-header">
+            <div class="verdict-icon-wrap">${icon}</div>
+            <div class="verdict-meta">
+              <div class="verdict-eyebrow">ML Verdict</div>
+              <div class="verdict-title">${label} News</div>
+            </div>
+            <div class="conf-badge">${confPct}%<small>Confidence</small></div>
+          </div>
+          <div class="result-body">
+            <div class="conf-bar-row"><span>Model Confidence</span><span>${confPct}%</span></div>
+            <div class="conf-track"><div class="conf-fill" id="confFill"></div></div>
+            <div class="result-note">${note}</div>
+          </div>
+          <div class="result-footer">
+            <div style="display:flex;gap:1.5rem;flex-wrap:wrap;">
+              <span class="result-meta-tag">⏱ Time <span>${ts}</span></span>
+              <span class="result-meta-tag">📏 Length <span>${text.length} chars</span></span>
+              <span class="result-meta-tag">🤖 Model <span>Naive Bayes</span></span>
+            </div>
+            <button class="re-analyze" id="reBtn">↺ Re-analyse</button>
+          </div>
+        </div>`;
+
+      resultSection.classList.add('visible');
+      setTimeout(() => { const f = document.getElementById('confFill'); if(f) f.style.width = confPct + '%'; }, 80);
+      document.getElementById('reBtn').addEventListener('click', () => {
+        newsInput.value = ''; charInfo.textContent = '0 characters';
+        resultSection.classList.remove('visible'); newsInput.focus();
+      });
+
+    } catch(err) {
+      resultCard.innerHTML = `
+        <div class="result-card error">
+          <div class="result-header">
+            <div class="verdict-icon-wrap">⚠️</div>
+            <div class="verdict-meta">
+              <div class="verdict-eyebrow">Connection Error</div>
+              <div class="verdict-title">Server Offline</div>
+            </div>
+          </div>
+          <div class="result-body">
+            <div class="result-note">Could not reach <code style="font-family:'IBM Plex Mono',monospace">localhost:5000</code>. Make sure your backend is running with <code style="font-family:'IBM Plex Mono',monospace">node server.js</code>.</div>
+          </div>
+        </div>`;
+      resultSection.classList.add('visible');
+    } finally {
+      analyzeBtn.disabled = false;
+      analyzeBtn.classList.remove('loading');
+      analyzeBtn.querySelector('.btn-label').textContent = 'Analyse Article';
+    }
+  });
+
+  newsInput.addEventListener('keydown', e => { if((e.ctrlKey||e.metaKey) && e.key==='Enter') analyzeBtn.click(); });
+</script>
+
+<!-- PARTICLE NETWORK -->
+<script>
+(function() {
+  const canvas = document.getElementById('particleCanvas');
+  const ctx    = canvas.getContext('2d');
+
+  let W, H, particles, mouse = { x: null, y: null };
+  const COUNT       = 88;
+  const MAX_DIST    = 140;
+  const MOUSE_DIST  = 180;
+
+  function isDark() { return document.body.classList.contains('dark'); }
+
+  function colors() {
+    return isDark()
+      ? { particle: 'rgba(107,159,212,', line: 'rgba(107,159,212,' }
+      : { particle: 'rgba(37,99,168,',   line: 'rgba(37,99,168,' };
+  }
+
+  function resize() {
+    W = canvas.width  = window.innerWidth;
+    H = canvas.height = window.innerHeight;
+  }
+
+  function rand(min, max) { return Math.random() * (max - min) + min; }
+
+  function makeParticle() {
+    return {
+      x:  rand(0, W),
+      y:  rand(0, H),
+      vx: rand(-0.35, 0.35),
+      vy: rand(-0.35, 0.35),
+      r:  rand(1.5, 3.2),
+      opacity: rand(0.4, 0.9)
+    };
+  }
+
+  function init() {
+    resize();
+    particles = Array.from({ length: COUNT }, makeParticle);
+  }
+
+  function draw() {
+    ctx.clearRect(0, 0, W, H);
+    const c = colors();
+
+    // Update + draw particles
+    for (let i = 0; i < particles.length; i++) {
+      const p = particles[i];
+      p.x += p.vx;
+      p.y += p.vy;
+
+      // Bounce off edges
+      if (p.x < 0 || p.x > W) p.vx *= -1;
+      if (p.y < 0 || p.y > H) p.vy *= -1;
+
+      // Mouse repulsion (subtle)
+      if (mouse.x !== null) {
+        const dx = p.x - mouse.x, dy = p.y - mouse.y;
+        const dist = Math.sqrt(dx*dx + dy*dy);
+        if (dist < MOUSE_DIST) {
+          const force = (MOUSE_DIST - dist) / MOUSE_DIST * 0.012;
+          p.vx += dx * force;
+          p.vy += dy * force;
+          // Speed cap
+          const spd = Math.sqrt(p.vx*p.vx + p.vy*p.vy);
+          if (spd > 1.8) { p.vx = p.vx/spd*1.8; p.vy = p.vy/spd*1.8; }
+        }
+      }
+
+      // Draw node
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+      ctx.fillStyle = c.particle + p.opacity + ')';
+      ctx.fill();
+
+      // Draw connections
+      for (let j = i + 1; j < particles.length; j++) {
+        const q  = particles[j];
+        const dx = p.x - q.x, dy = p.y - q.y;
+        const d  = Math.sqrt(dx*dx + dy*dy);
+        if (d < MAX_DIST) {
+          const alpha = (1 - d / MAX_DIST) * 0.45;
+          ctx.beginPath();
+          ctx.moveTo(p.x, p.y);
+          ctx.lineTo(q.x, q.y);
+          ctx.strokeStyle = c.line + alpha + ')';
+          ctx.lineWidth   = 0.8;
+          ctx.stroke();
+        }
+      }
+
+      // Mouse connections
+      if (mouse.x !== null) {
+        const dx = p.x - mouse.x, dy = p.y - mouse.y;
+        const d  = Math.sqrt(dx*dx + dy*dy);
+        if (d < MOUSE_DIST) {
+          const alpha = (1 - d / MOUSE_DIST) * 0.6;
+          ctx.beginPath();
+          ctx.moveTo(p.x, p.y);
+          ctx.lineTo(mouse.x, mouse.y);
+          ctx.strokeStyle = c.line + alpha + ')';
+          ctx.lineWidth   = 1;
+          ctx.stroke();
+        }
+      }
+    }
+
+    requestAnimationFrame(draw);
+  }
+
+  window.addEventListener('resize', () => { resize(); });
+  window.addEventListener('mousemove', e => { mouse.x = e.clientX; mouse.y = e.clientY; });
+  window.addEventListener('mouseleave', () => { mouse.x = null; mouse.y = null; });
+
+  init();
+  draw();
+})();
+</script>
+</body>
+</html>
+    
+    

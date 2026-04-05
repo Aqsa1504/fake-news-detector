@@ -1,0 +1,175 @@
+/* ===============================
+   GLOBAL STYLES
+================================ */
+
+body {
+    font-family: "Segoe UI", sans-serif;
+    background: linear-gradient(120deg, #eef2ff, #fdfbff);
+    transition: background 0.5s ease, color 0.5s ease;
+}
+
+.content {
+  background: #ffffff;
+  border-radius: 14px;
+  padding: 24px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.06);
+}
+
+h1, h2, h3 {
+  color: #455c7b;
+}
+
+p {
+  color: #374151;
+}
+
+:root {
+  --accent: #4f46e5;
+}
+a, .highlight {
+  color: var(--accent);
+}
+section {
+  margin-bottom: 32px;
+}
+
+
+
+
+
+/* ===============================
+   NAVBAR
+================================ */
+
+.navbar {
+    background-color: #ffffff;
+    border-bottom: 1px solid #ddd;
+}
+
+/* ===============================
+   CARD
+================================ */
+
+.news-card {
+    width: 100%;
+    max-width: 600px;
+    border-radius: 16px;
+}
+
+/* ===============================
+   FOOTER
+================================ */
+
+footer {
+    background-color: #f6f7f9;
+}
+
+/* ===============================
+   DARK MODE STYLES
+================================ */
+
+/* Dark mode background */
+body.dark-mode {
+    background: linear-gradient(120deg, #0f2027, #203a43, #2c5364);
+    color: #f1f1f1;
+}
+
+/* Muted text visibility in dark mode */
+body.dark-mode .text-muted {
+    color: #cccccc !important;
+}
+
+
+body.dark-mode .navbar-brand {
+    color: #f1f1f1;
+}
+
+
+body.dark-mode .navbar,
+body.dark-mode footer {
+    background-color: #1c1c1c;
+    border-color: #333;
+}
+
+body.dark-mode .card {
+    background-color: #242424;
+    color: #f1f1f1;
+}
+
+body.dark-mode .form-control {
+    background-color: #2e2e2e;
+    color: #ffffff;
+    border-color: #444;
+}
+
+body.dark-mode .form-control::placeholder {
+    color: #bbbbbb;
+}
+
+body.dark-mode .btn-primary {
+    background-color: #4f7cff;
+    border: none;
+}
+
+body.dark-mode .analyze-title {
+  color: #93c5fd; /* soft light blue */
+}
+
+/* ===============================
+   RESULT BADGES
+================================ */
+
+.result-real {
+    color: #0f5132;
+    background-color: #d1e7dd;
+    padding: 10px;
+    border-radius: 8px;
+}
+
+.result-fake {
+    color: #842029;
+    background-color: #f8d7da;
+    padding: 10px;
+    border-radius: 8px;
+}
+
+#themeToggle {
+    transition: all 0.3s ease;
+}
+
+body.dark-mode #themeToggle {
+    background-color: #4f7cff;
+    color: #ffffff;
+    border: none;
+}
+
+body.dark {
+  background-color: #121212;   /* not pure black */
+  color: #eaeaea;
+  font-size: 1.05rem;
+  line-height: 1.7;
+}
+
+
+/* Dark mode result colors */
+body.dark-mode .result-real {
+    background-color: #1e3d2b;
+    color: #9be5c1;
+}
+
+body.dark-mode .result-fake {
+    background-color: #4a1c1c;
+    color: #ffb3b3;
+}
+
+
+.news-card {
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+    transition: box-shadow 0.4s ease;
+}
+
+body.dark-mode .news-card {
+    box-shadow: 0 10px 30px rgba(79, 124, 255, 0.3);
+}
+
+
